@@ -22,7 +22,7 @@
             <h1>PAKTV</h1>
             <span>Live</span>
         </div>
-        
+
         <div class="search-box">
             <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             <input type="text" id="search-input" placeholder="Search channel, category, country...">
@@ -70,7 +70,7 @@
                     </label>
                 </div>
             </div>
-            
+
             <div class="channels-list-wrapper">
                 <div class="section-title">
                     <span>Live Channels</span>
@@ -87,7 +87,7 @@
                 <!-- Custom HLS Video Player Screen -->
                 <div id="player-container" class="pak-player-container paused">
                     <video id="main-video" playsinline></video>
-                    
+
                     <!-- Buffer Loading Overlay -->
                     <div class="player-overlay">
                         <div class="spinner"></div>
@@ -164,9 +164,7 @@
                     <div class="section-title">
                         <span>Favorite Channels</span>
                     </div>
-                    <div id="fav-shelf-scroll" class="shelf-scroll">
-                        <!-- Fav items loaded dynamically -->
-                    </div>
+                    <div id="fav-shelf-scroll" class="shelf-scroll"></div>
                 </div>
 
                 <!-- Shelf: Watch History -->
@@ -174,9 +172,7 @@
                     <div class="section-title">
                         <span>Recently Watched</span>
                     </div>
-                    <div id="history-shelf-scroll" class="shelf-scroll">
-                        <!-- History items loaded dynamically -->
-                    </div>
+                    <div id="history-shelf-scroll" class="shelf-scroll"></div>
                 </div>
 
             </div>
