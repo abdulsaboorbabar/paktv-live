@@ -1,0 +1,13 @@
+{
+  "name": "paktv-live",
+  "version": "1.0.0",
+  "description": "PAKTV Live - Watch Public TV Channels Anywhere",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3"
+  }
+}
