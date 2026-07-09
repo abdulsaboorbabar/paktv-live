@@ -69,12 +69,14 @@ class PakPlayer {
     });
   }
 
-  loadStream(url) {
+  loadStream(url, isRetry = false) {
     if (!url) return;
     this.streamUrl = url;
-    this.retryCount = 0;
+    if (!isRetry) {
+      this.retryCount = 0;
+    }
     this.showBuffer();
-    this.showStatus('Connecting to stream...');
+    this.showStatus(isRetry ? `Stream disconnected. Retrying (${this.retryCount}/${this.maxRetries})...` : 'Connecting to stream...');
 
     if (this.hls) {
       this.hls.destroy();
@@ -136,13 +138,12 @@ class PakPlayer {
   handleReconnection() {
     if (this.retryCount < this.maxRetries) {
       this.retryCount++;
-      this.showStatus(`Stream disconnected. Retrying (${this.retryCount}/${this.maxRetries})...`);
       this.showBuffer();
       setTimeout(() => {
-        this.loadStream(this.streamUrl);
+        this.loadStream(this.streamUrl, true);
       }, this.retryDelay);
     } else {
-      this.showError('Stream link offline. Click reload to try again.');
+      this.showError('Stream offline or blocked (CORS). Try another channel.');
       this.hideBuffer();
     }
   }
