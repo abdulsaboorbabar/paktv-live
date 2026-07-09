@@ -1,438 +1,331 @@
 // js/app.js
 
 document.addEventListener('DOMContentLoaded', () => {
-  // App state
+
+  // ── State ──────────────────────────────────────────────────────────────────
   const state = {
-    channels: [],
-    favorites: JSON.parse(localStorage.getItem('paktv_favorites')) || [],
-    history: JSON.parse(localStorage.getItem('paktv_history')) || [],
-    filters: {
-      search: '',
-      country: '',
-      category: '',
-      language: '',
-      hd: 0,
-      favoritesOnly: false,
-      onlineOnly: 1
-    },
-    pagination: {
-      limit: 40,
-      offset: 0,
-      hasMore: true,
-      loading: false
-    },
-    deferredPrompt: null
+    favorites:     JSON.parse(localStorage.getItem('paktv_fav')  || '[]'),
+    history:       JSON.parse(localStorage.getItem('paktv_hist') || '[]'),
+    filters:       { q: '', country: '', category: '', language: '', hd: false, favOnly: false },
+    deferredPrompt: null,
+    currentChannel: null,
   };
 
-  // DOM Elements
-  const videoEl = document.getElementById('main-video');
-  const playerContainer = document.getElementById('player-container');
-  const channelsGrid = document.getElementById('channels-grid');
-  
-  // Filters
-  const searchInput = document.getElementById('search-input');
-  const countrySelect = document.getElementById('country-select');
-  const categorySelect = document.getElementById('category-select');
-  const languageSelect = document.getElementById('language-select');
-  const hdCheckbox = document.getElementById('hd-checkbox');
-  const favoritesCheckbox = document.getElementById('favorites-checkbox');
-  
-  // Shelf sections
-  const favShelfWrapper = document.getElementById('fav-shelf-wrapper');
-  const favShelfScroll = document.getElementById('fav-shelf-scroll');
-  const historyShelfWrapper = document.getElementById('history-shelf-wrapper');
-  const historyShelfScroll = document.getElementById('history-shelf-scroll');
+  const store = new ChannelStore();
 
-  // Headers
-  const refreshBtn = document.getElementById('refresh-btn');
-  const installBtn = document.getElementById('install-btn');
-  const onlineStatus = document.getElementById('online-status');
-  const streamTitle = document.getElementById('stream-title');
-  const streamCategory = document.getElementById('stream-category');
-  const streamCountry = document.getElementById('stream-country');
-  const streamLanguage = document.getElementById('stream-language');
-  
-  // Custom Player Controls
-  const playBtn = document.getElementById('player-play');
-  const stopBtn = document.getElementById('player-stop');
-  const muteBtn = document.getElementById('player-mute');
-  const volumeSlider = document.getElementById('player-volume');
-  const speedSelector = document.getElementById('player-speed');
-  const screenshotBtn = document.getElementById('player-screenshot');
-  const pipBtn = document.getElementById('player-pip');
-  const fullscreenBtn = document.getElementById('player-fullscreen');
-  const reloadBtn = document.getElementById('player-reload');
-  const theaterBtn = document.getElementById('player-theater');
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const videoEl         = $('main-video');
+  const playerContainer = $('player-container');
+  const channelsGrid    = $('channels-grid');
+  const searchInput     = $('search-input');
+  const countrySelect   = $('country-select');
+  const categorySelect  = $('category-select');
+  const languageSelect  = $('language-select');
+  const hdCheckbox      = $('hd-checkbox');
+  const favCheckbox     = $('fav-checkbox');
+  const refreshBtn      = $('refresh-btn');
+  const installBtn      = $('install-btn');
+  const onlineStatus    = $('online-status');
+  const streamTitle     = $('stream-title');
+  const streamCategory  = $('stream-category');
+  const streamCountry   = $('stream-country');
+  const streamLanguage  = $('stream-language');
+  const favWrapper      = $('fav-shelf-wrapper');
+  const favScroll       = $('fav-shelf-scroll');
+  const histWrapper     = $('history-shelf-wrapper');
+  const histScroll      = $('history-shelf-scroll');
+  const channelCount    = $('channel-count');
+  const importModal     = $('import-modal');
+  const importBtn       = $('import-btn');
+  const importClose     = $('import-close');
+  const importUrlInput  = $('import-url');
+  const importFetchBtn  = $('import-fetch-btn');
+  const importFile      = $('import-file');
+  const importStatus    = $('import-status');
 
-  // Initialize PakPlayer instance
+  // ── Init Player ────────────────────────────────────────────────────────────
   const player = new PakPlayer(videoEl, playerContainer);
 
-  // Load select filters
-  loadFilterOptions();
+  // Wire player controls
+  const wire = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', fn); };
+  wire('player-play',       () => player.togglePlay());
+  wire('player-stop',       () => player.stop());
+  wire('player-reload',     () => player.loadStream(player.streamUrl));
+  wire('player-mute',       () => player.toggleMute());
+  wire('player-screenshot', () => player.takeScreenshot());
+  wire('player-pip',        () => player.togglePip());
+  wire('player-fullscreen', () => player.toggleFullscreen());
+  wire('player-theater',    () => player.toggleTheaterMode());
 
-  // Load channels initially
-  fetchChannels(true);
-  updateShelves();
+  const volSlider  = $('player-volume');
+  const speedSel   = $('player-speed');
+  if (volSlider) volSlider.addEventListener('input', e => player.setVolume(parseFloat(e.target.value)));
+  if (speedSel)  speedSel.addEventListener('change', e => player.setPlaybackSpeed(parseFloat(e.target.value)));
 
-  // Setup custom player control click bindings
-  if (playBtn) playBtn.addEventListener('click', () => player.togglePlay());
-  if (stopBtn) stopBtn.addEventListener('click', () => player.stop());
-  if (muteBtn) muteBtn.addEventListener('click', () => player.toggleMute());
-  if (volumeSlider) {
-    volumeSlider.addEventListener('input', (e) => player.setVolume(e.target.value));
-  }
-  if (speedSelector) {
-    speedSelector.addEventListener('change', (e) => player.setPlaybackSpeed(parseFloat(e.target.value)));
-  }
-  if (screenshotBtn) screenshotBtn.addEventListener('click', () => player.takeScreenshot());
-  if (pipBtn) pipBtn.addEventListener('click', () => player.togglePip());
-  if (fullscreenBtn) fullscreenBtn.addEventListener('click', () => player.toggleFullscreen());
-  if (reloadBtn) reloadBtn.addEventListener('click', () => player.loadStream(player.streamUrl));
-  if (theaterBtn) theaterBtn.addEventListener('click', () => player.toggleTheaterMode());
+  // ── Load channels & boot ───────────────────────────────────────────────────
+  showGridLoading();
 
-  // Listeners for filters
-  let debounceTimeout = null;
-  searchInput.addEventListener('input', (e) => {
-    clearTimeout(debounceTimeout);
-    debounceTimeout = setTimeout(() => {
-      state.filters.search = e.target.value;
-      fetchChannels(true);
-    }, 250);
+  store.init((channels, msg) => {
+    if (msg) {
+      // Show status message in grid while fetching live data
+      return;
+    }
+    if (channels) {
+      populateFilterDropdowns();
+      renderGrid();
+      updateShelves();
+    }
   });
 
-  countrySelect.addEventListener('change', (e) => {
-    state.filters.country = e.target.value;
-    fetchChannels(true);
+  // ── Filter event listeners ─────────────────────────────────────────────────
+  let debounce = null;
+  searchInput.addEventListener('input', e => {
+    clearTimeout(debounce);
+    debounce = setTimeout(() => {
+      state.filters.q = e.target.value;
+      renderGrid();
+    }, 200);
   });
 
-  categorySelect.addEventListener('change', (e) => {
-    state.filters.category = e.target.value;
-    fetchChannels(true);
-  });
-
-  languageSelect.addEventListener('change', (e) => {
-    state.filters.language = e.target.value;
-    fetchChannels(true);
-  });
-
-  hdCheckbox.addEventListener('change', (e) => {
-    state.filters.hd = e.target.checked ? 1 : 0;
-    fetchChannels(true);
-  });
-
-  favoritesCheckbox.addEventListener('change', (e) => {
-    state.filters.favoritesOnly = e.target.checked;
-    fetchChannels(true);
-  });
+  countrySelect.addEventListener('change',  e => { state.filters.country   = e.target.value; renderGrid(); });
+  categorySelect.addEventListener('change', e => { state.filters.category  = e.target.value; renderGrid(); });
+  languageSelect.addEventListener('change', e => { state.filters.language  = e.target.value; renderGrid(); });
+  hdCheckbox.addEventListener('change',     e => { state.filters.hd        = e.target.checked; renderGrid(); });
+  favCheckbox.addEventListener('change',    e => { state.filters.favOnly   = e.target.checked; renderGrid(); });
 
   refreshBtn.addEventListener('click', () => {
-    fetchChannels(true);
-    loadFilterOptions();
+    showGridLoading();
+    store.init((channels) => {
+      if (channels) { populateFilterDropdowns(); renderGrid(); updateShelves(); }
+    });
   });
 
-  // Load filters from API
-  function loadFilterOptions() {
-    fetch('/api/countries.php')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          countrySelect.innerHTML = '<option value="">All Countries</option>';
-          data.countries.forEach(c => {
-            countrySelect.innerHTML += `<option value="${c}">${c}</option>`;
-          });
-        }
-      });
-
-    fetch('/api/categories.php')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          categorySelect.innerHTML = '<option value="">All Categories</option>';
-          data.categories.forEach(c => {
-            categorySelect.innerHTML += `<option value="${c}">${c}</option>`;
-          });
-        }
-      });
-
-    fetch('/api/languages.php')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          languageSelect.innerHTML = '<option value="">All Languages</option>';
-          data.languages.forEach(l => {
-            languageSelect.innerHTML += `<option value="${l}">${l}</option>`;
-          });
-        }
-      });
+  // ── Filter dropdowns ───────────────────────────────────────────────────────
+  function populateFilterDropdowns() {
+    populateSelect(countrySelect,  store.countries,  'All Countries');
+    populateSelect(categorySelect, store.categories, 'All Categories');
+    populateSelect(languageSelect, store.languages,  'All Languages');
   }
 
-  // Fetch Channels
-  function fetchChannels(reset = false) {
-    if (state.pagination.loading) return;
-    if (reset) {
-      state.pagination.offset = 0;
-      state.pagination.hasMore = true;
-      channelsGrid.innerHTML = '';
-    }
-
-    if (!state.pagination.hasMore) return;
-    state.pagination.loading = true;
-
-    // Show buffering status or loading in grid
-    if (reset) {
-      channelsGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-muted);">Loading channels...</div>';
-    }
-
-    // Build URL query parameters
-    let url = `/api/channels.php?limit=${state.pagination.limit}&offset=${state.pagination.offset}`;
-    if (state.filters.search) url += `&search=${encodeURIComponent(state.filters.search)}`;
-    if (state.filters.country) url += `&country=${encodeURIComponent(state.filters.country)}`;
-    if (state.filters.category) url += `&category=${encodeURIComponent(state.filters.category)}`;
-    if (state.filters.language) url += `&language=${encodeURIComponent(state.filters.language)}`;
-    if (state.filters.hd) url += `&hd=1`;
-    if (state.filters.onlineOnly) url += `&online=1`;
-
-    // Handle Favorites only filter
-    if (state.filters.favoritesOnly) {
-      if (state.favorites.length === 0) {
-        channelsGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-muted);">No favorite channels added yet.</div>';
-        state.pagination.loading = false;
-        return;
-      }
-      url = `/api/favorites.php?ids=${state.favorites.join(',')}`;
-    }
-
-    fetch(url)
-      .then(res => res.json())
-      .then(data => {
-        if (reset) channelsGrid.innerHTML = '';
-        
-        if (data.success) {
-          const channels = data.channels || [];
-          if (channels.length === 0 && reset) {
-            channelsGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: var(--text-muted);">No channels found matching the filters.</div>';
-          } else {
-            renderChannels(channels, channelsGrid);
-          }
-
-          if (state.filters.favoritesOnly) {
-            state.pagination.hasMore = false;
-          } else {
-            state.pagination.offset += channels.length;
-            if (channels.length < state.pagination.limit) {
-              state.pagination.hasMore = false;
-            }
-          }
-        }
-      })
-      .catch(err => {
-        console.error(err);
-        if (reset) channelsGrid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 2rem; color: #ef4444;">Failed to load channels.</div>';
-      })
-      .finally(() => {
-        state.pagination.loading = false;
-      });
+  function populateSelect(el, items, placeholder) {
+    const current = el.value;
+    el.innerHTML = `<option value="">${placeholder}</option>`;
+    items.forEach(item => {
+      const opt = document.createElement('option');
+      opt.value = item;
+      opt.textContent = item;
+      if (item === current) opt.selected = true;
+      el.appendChild(opt);
+    });
   }
 
-  // Render Channels grid
-  function renderChannels(channels, container, append = true) {
-    if (!append) container.innerHTML = '';
+  // ── Render channel grid ────────────────────────────────────────────────────
+  function renderGrid() {
+    const filters = {
+      q:        state.filters.q,
+      country:  state.filters.country,
+      category: state.filters.category,
+      language: state.filters.language,
+      hd:       state.filters.hd,
+      favIds:   state.filters.favOnly ? state.favorites : null,
+    };
 
-    channels.forEach(ch => {
-      const isFav = state.favorites.includes(ch.id);
-      const card = document.createElement('div');
-      card.className = 'channel-card';
-      card.dataset.id = ch.id;
-      
-      const logo = ch.logo_url ? ch.logo_url : '/icons/icon-192.png';
+    const channels = store.search(filters);
 
-      card.innerHTML = `
-        <div class="logo-container">
-          <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3C/svg%3E" data-src="${logo}" class="lazy-logo" alt="${ch.name}">
+    if (channelCount) channelCount.textContent = channels.length;
+
+    channelsGrid.innerHTML = '';
+
+    if (channels.length === 0) {
+      channelsGrid.innerHTML = `
+        <div class="empty-state">
+          <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/></svg>
+          <p>No channels found</p>
+          <small>Try adjusting your filters or <button class="link-btn" id="clear-filters-btn">clear all filters</button></small>
+        </div>`;
+      const clr = $('clear-filters-btn');
+      if (clr) clr.addEventListener('click', clearFilters);
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    channels.forEach(ch => frag.appendChild(buildCard(ch)));
+    channelsGrid.appendChild(frag);
+    observeLazyImages();
+  }
+
+  function clearFilters() {
+    state.filters = { q: '', country: '', category: '', language: '', hd: false, favOnly: false };
+    searchInput.value = '';
+    countrySelect.value = '';
+    categorySelect.value = '';
+    languageSelect.value = '';
+    hdCheckbox.checked = false;
+    favCheckbox.checked = false;
+    renderGrid();
+  }
+
+  // ── Channel Card ───────────────────────────────────────────────────────────
+  function buildCard(ch) {
+    const isFav = state.favorites.includes(ch.id);
+    const card  = document.createElement('div');
+    card.className = 'channel-card';
+    card.dataset.id = ch.id;
+
+    const logoSrc = ch.logo_url || ch.logo || '';
+
+    card.innerHTML = `
+      <div class="logo-container">
+        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"
+             data-src="${logoSrc}"
+             alt="${ch.name}"
+             class="lazy-logo channel-logo"
+             onerror="this.src='/icons/tv-placeholder.svg'">
+      </div>
+      <div class="info-container">
+        <div class="channel-name">${ch.name}</div>
+        <div class="meta-row">
+          <span class="badge badge-cat">${ch.category || 'TV'}</span>
+          ${ch.country ? `<span class="meta-country">${ch.country}</span>` : ''}
+          ${ch.is_hd ? '<span class="badge badge-hd">HD</span>' : ''}
         </div>
-        <div class="info-container">
-          <div class="channel-name">${ch.name}</div>
-          <div class="meta-row">
-            <span class="badge badge-cat">${ch.category || 'TV'}</span>
-            <span>${ch.country || ''}</span>
-            ${ch.is_hd ? '<span class="badge badge-hd">HD</span>' : ''}
-          </div>
-        </div>
-        <button class="favorite-btn ${isFav ? 'is-fav' : ''}" data-id="${ch.id}">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-          </svg>
-        </button>
-      `;
+      </div>
+      <button class="favorite-btn ${isFav ? 'is-fav' : ''}" data-id="${ch.id}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">
+        <svg viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+      </button>`;
 
-      // Event: Play Stream
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.favorite-btn')) return;
-        playChannel(ch);
-      });
-
-      // Event: Toggle Favorite
-      const favBtn = card.querySelector('.favorite-btn');
-      favBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleFavorite(ch.id);
-        favBtn.classList.toggle('is-fav');
-      });
-
-      container.appendChild(card);
+    card.addEventListener('click', e => {
+      if (e.target.closest('.favorite-btn')) return;
+      playChannel(ch);
     });
 
-    lazyLoadLogos();
-  }
-
-  // Play Channel
-  function playChannel(channel) {
-    player.loadStream(channel.stream_url);
-    
-    // Update active state in list
-    document.querySelectorAll('.channel-card').forEach(card => {
-      if (card.dataset.id == channel.id) {
-        card.classList.add('active');
-      } else {
-        card.classList.remove('active');
-      }
+    card.querySelector('.favorite-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      toggleFavorite(ch.id);
+      e.currentTarget.classList.toggle('is-fav');
     });
 
-    // Update Meta info panel
-    if (streamTitle) streamTitle.textContent = channel.name;
-    if (streamCategory) streamCategory.textContent = channel.category || 'General';
-    if (streamCountry) streamCountry.textContent = channel.country || 'Global';
-    if (streamLanguage) streamLanguage.textContent = channel.language || 'Unknown';
+    return card;
+  }
 
-    // Store in history
-    addToHistory(channel.id);
+  // ── Play ───────────────────────────────────────────────────────────────────
+  function playChannel(ch) {
+    state.currentChannel = ch;
+    player.loadStream(ch.stream_url);
+
+    document.querySelectorAll('.channel-card').forEach(c =>
+      c.classList.toggle('active', c.dataset.id == ch.id)
+    );
+
+    if (streamTitle)    streamTitle.textContent    = ch.name;
+    if (streamCategory) streamCategory.textContent = ch.category || 'General';
+    if (streamCountry)  streamCountry.textContent  = ch.country  || 'Global';
+    if (streamLanguage) streamLanguage.textContent = ch.language || '—';
+
+    addToHistory(ch.id);
     updateShelves();
 
-    // Scroll to player on small viewports
+    // Scroll player into view on mobile/tablet
     if (window.innerWidth <= 992) {
       playerContainer.scrollIntoView({ behavior: 'smooth' });
     }
   }
 
-  // Toggle Favorite logic
+  // ── Favorites ──────────────────────────────────────────────────────────────
   function toggleFavorite(id) {
-    id = parseInt(id);
-    const index = state.favorites.indexOf(id);
-    if (index === -1) {
-      state.favorites.push(id);
-    } else {
-      state.favorites.splice(index, 1);
-    }
-    localStorage.setItem('paktv_favorites', JSON.stringify(state.favorites));
+    const idx = state.favorites.indexOf(id);
+    if (idx === -1) state.favorites.push(id);
+    else            state.favorites.splice(idx, 1);
+    localStorage.setItem('paktv_fav', JSON.stringify(state.favorites));
     updateShelves();
   }
 
-  // Add to watch history
+  // ── History ────────────────────────────────────────────────────────────────
   function addToHistory(id) {
-    id = parseInt(id);
-    const index = state.history.indexOf(id);
-    if (index !== -1) {
-      state.history.splice(index, 1);
-    }
-    state.history.unshift(id); // Place at top of history list
-    
-    // Cap history size to 15
-    if (state.history.length > 15) {
-      state.history.pop();
-    }
-    
-    localStorage.setItem('paktv_history', JSON.stringify(state.history));
+    const idx = state.history.indexOf(id);
+    if (idx !== -1) state.history.splice(idx, 1);
+    state.history.unshift(id);
+    if (state.history.length > 15) state.history.pop();
+    localStorage.setItem('paktv_hist', JSON.stringify(state.history));
   }
 
-  // Update shelf channels (Favorites / Watch History shelves)
+  // ── Shelves ────────────────────────────────────────────────────────────────
   function updateShelves() {
     // Favorites shelf
     if (state.favorites.length > 0) {
-      favShelfWrapper.style.display = 'block';
-      fetch(`/api/favorites.php?ids=${state.favorites.join(',')}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            favShelfScroll.innerHTML = '';
-            renderChannels(data.channels, favShelfScroll);
-          }
-        });
+      favWrapper.style.display = 'block';
+      favScroll.innerHTML = '';
+      store.getById(state.favorites).forEach(ch => favScroll.appendChild(buildCard(ch)));
+      observeLazyImages();
     } else {
-      favShelfWrapper.style.display = 'none';
+      favWrapper.style.display = 'none';
     }
 
-    // Watch History shelf
+    // History shelf
     if (state.history.length > 0) {
-      historyShelfWrapper.style.display = 'block';
-      fetch(`/api/history.php?ids=${state.history.join(',')}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            historyShelfScroll.innerHTML = '';
-            renderChannels(data.channels, historyShelfScroll);
-          }
-        });
+      histWrapper.style.display = 'block';
+      histScroll.innerHTML = '';
+      store.getById(state.history).forEach(ch => histScroll.appendChild(buildCard(ch)));
+      observeLazyImages();
     } else {
-      historyShelfWrapper.style.display = 'none';
+      histWrapper.style.display = 'none';
     }
   }
 
-  // Lazy loading image handler
-  function lazyLoadLogos() {
-    const lazyImages = document.querySelectorAll('.lazy-logo');
-    
+  // ── Lazy image loading ─────────────────────────────────────────────────────
+  let imgObserver;
+  function observeLazyImages() {
+    const imgs = document.querySelectorAll('.lazy-logo[data-src]');
     if ('IntersectionObserver' in window) {
-      const observer = new IntersectionObserver((entries, observer) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const img = entry.target;
-            img.src = img.dataset.src;
-            img.classList.remove('lazy-logo');
-            observer.unobserve(img);
-          }
-        });
-      });
-      lazyImages.forEach(img => observer.observe(img));
-    } else {
-      lazyImages.forEach(img => {
-        img.src = img.dataset.src;
-      });
-    }
-  }
-
-  // Infinite Scroll for channels list
-  const listWrapper = document.querySelector('.channels-list-wrapper');
-  listWrapper.addEventListener('scroll', () => {
-    if (listWrapper.scrollTop + listWrapper.clientHeight >= listWrapper.scrollHeight - 50) {
-      if (!state.filters.favoritesOnly) {
-        fetchChannels();
+      if (!imgObserver) {
+        imgObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const img = entry.target;
+              if (img.dataset.src) {
+                img.src = img.dataset.src;
+                delete img.dataset.src;
+              }
+              imgObserver.unobserve(img);
+            }
+          });
+        }, { rootMargin: '100px' });
       }
-    }
-  });
-
-  // Online Status Indicator
-  function updateOnlineStatus() {
-    if (navigator.onLine) {
-      onlineStatus.classList.remove('offline');
-      onlineStatus.querySelector('span').textContent = 'Online';
+      imgs.forEach(img => imgObserver.observe(img));
     } else {
-      onlineStatus.classList.add('offline');
-      onlineStatus.querySelector('span').textContent = 'Offline';
+      imgs.forEach(img => { img.src = img.dataset.src; delete img.dataset.src; });
     }
   }
-  window.addEventListener('online', updateOnlineStatus);
+
+  // ── Grid loading state ─────────────────────────────────────────────────────
+  function showGridLoading() {
+    channelsGrid.innerHTML = `
+      <div class="loading-state">
+        <div class="loading-spinner"></div>
+        <p>Loading channels...</p>
+      </div>`;
+  }
+
+  // ── Online Status ──────────────────────────────────────────────────────────
+  function updateOnlineStatus() {
+    const online = navigator.onLine;
+    onlineStatus.classList.toggle('offline', !online);
+    onlineStatus.querySelector('span').textContent = online ? 'Online' : 'Offline';
+  }
+  window.addEventListener('online',  updateOnlineStatus);
   window.addEventListener('offline', updateOnlineStatus);
   updateOnlineStatus();
 
-  // PWA Register Service Worker
+  // ── PWA Service Worker ────────────────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js')
-      .then(reg => console.log('Service Worker Registered successfully', reg.scope))
-      .catch(err => console.warn('Service Worker registration failed', err));
+      .then(r  => console.log('SW registered:', r.scope))
+      .catch(e => console.warn('SW failed:', e));
   }
 
-  // Capture PWA Install Prompt
-  window.addEventListener('beforeinstallprompt', (e) => {
+  // ── PWA Install Prompt ────────────────────────────────────────────────────
+  window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     state.deferredPrompt = e;
     installBtn.style.display = 'flex';
@@ -441,12 +334,78 @@ document.addEventListener('DOMContentLoaded', () => {
   installBtn.addEventListener('click', () => {
     if (!state.deferredPrompt) return;
     state.deferredPrompt.prompt();
-    state.deferredPrompt.userChoice.then((choiceResult) => {
-      if (choiceResult.outcome === 'accepted') {
-        console.log('User accepted the PWA install prompt');
-      }
+    state.deferredPrompt.userChoice.then(() => {
       state.deferredPrompt = null;
       installBtn.style.display = 'none';
     });
   });
+
+  // ── Import Modal ──────────────────────────────────────────────────────────
+  importBtn.addEventListener('click', () => {
+    importModal.classList.add('open');
+    importStatus.textContent = '';
+    importUrlInput.value = '';
+  });
+
+  importClose.addEventListener('click', () => importModal.classList.remove('open'));
+  importModal.addEventListener('click', e => { if (e.target === importModal) importModal.classList.remove('open'); });
+
+  // Quick-load iptv-org country buttons
+  document.querySelectorAll('.iptv-org-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const code = btn.dataset.code;
+      importStatus.textContent = `Fetching ${btn.textContent} channels...`;
+      importStatus.className = 'import-status loading';
+      try {
+        const channels = await fetchIPTVOrg(code);
+        const added = store.add(channels);
+        populateFilterDropdowns();
+        renderGrid();
+        importStatus.textContent = `✓ Added ${added} new channels from ${btn.textContent}`;
+        importStatus.className = 'import-status success';
+      } catch (e) {
+        importStatus.textContent = `✗ Failed: ${e.message}`;
+        importStatus.className = 'import-status error';
+      }
+    });
+  });
+
+  // Fetch from custom URL
+  importFetchBtn.addEventListener('click', async () => {
+    const url = importUrlInput.value.trim();
+    if (!url) return;
+    importStatus.textContent = 'Fetching...';
+    importStatus.className = 'import-status loading';
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      const channels = parseM3U(text);
+      const added = store.add(channels);
+      populateFilterDropdowns();
+      renderGrid();
+      importStatus.textContent = `✓ Added ${added} new channels`;
+      importStatus.className = 'import-status success';
+    } catch (e) {
+      importStatus.textContent = `✗ Failed: ${e.message}. Try using a CORS proxy or paste the file.`;
+      importStatus.className = 'import-status error';
+    }
+  });
+
+  // Load from local .m3u file
+  importFile.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const channels = parseM3U(ev.target.result);
+      const added = store.add(channels);
+      populateFilterDropdowns();
+      renderGrid();
+      importStatus.textContent = `✓ Loaded ${added} channels from file`;
+      importStatus.className = 'import-status success';
+    };
+    reader.readAsText(file);
+  });
+
 });
