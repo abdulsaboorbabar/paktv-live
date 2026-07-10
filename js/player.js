@@ -106,6 +106,25 @@ class PakPlayer {
     this.showBuffer();
     this.showStatus(isRetry ? `Stream disconnected. Retrying (${this.retryCount}/${this.maxRetries})...` : 'Connecting to stream...');
 
+    // Run a quick pre-flight fetch to check for CORS blocks or offline servers
+    if (!isRetry) {
+      fetch(url, { method: 'GET', mode: 'cors' })
+        .then(res => {
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          // Proceed with HLS loading
+          this.initHlsLoader(url);
+        })
+        .catch(err => {
+          console.warn('Pre-flight fetch failed:', err);
+          this.showError('Stream offline or blocked by browser security (CORS). Try another channel.');
+          this.hideBuffer();
+        });
+    } else {
+      this.initHlsLoader(url);
+    }
+  }
+
+  initHlsLoader(url) {
     this.destroyHls();
 
     if (Hls.isSupported()) {
