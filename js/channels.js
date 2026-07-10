@@ -18,12 +18,22 @@ const FALLBACK_CHANNELS = [
 const IPTV_ORG_COUNTRIES = {
   'Pakistan':       'pk',
   'India':          'in',
+  'USA':            'us',
+  'United Kingdom': 'gb',
   'Saudi Arabia':   'sa',
   'UAE':            'ae',
-  'United Kingdom': 'gb',
-  'USA':            'us',
   'Turkey':         'tr',
   'Qatar':          'qa',
+  'Canada':         'ca',
+  'Australia':      'au',
+  'Germany':        'de',
+  'France':         'fr',
+  'Italy':          'it',
+  'Spain':          'es',
+  'Bangladesh':     'bd',
+  'Afghanistan':    'af',
+  'Iran':           'ir',
+  'China':          'cn',
 };
 
 // ── M3U Parser ────────────────────────────────────────────────────────────────
@@ -129,6 +139,24 @@ class ChannelStore {
     } catch (e) {
       console.warn('iptv-org fetch failed, using fallback data.', e.message);
       if (onProgress) onProgress(this._channels);
+    }
+  }
+
+  async loadCountry(countryCode, onProgress) {
+    if (onProgress) onProgress(null, `Fetching channels for ${countryCode}...`);
+    try {
+      const live = await fetchIPTVOrg(countryCode);
+      if (live.length > 0) {
+        const existingUrls = new Set(this._channels.map(c => c.stream_url));
+        const newOnes = live.filter(c => !existingUrls.has(c.stream_url));
+        this._channels = [...this._channels, ...newOnes];
+      }
+      if (onProgress) onProgress(this._channels);
+      return true;
+    } catch (e) {
+      console.warn(`Failed to fetch country ${countryCode}:`, e.message);
+      if (onProgress) onProgress(this._channels, `Failed to load channels for ${countryCode}`);
+      return false;
     }
   }
 

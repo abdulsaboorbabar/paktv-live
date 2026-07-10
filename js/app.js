@@ -19,9 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const videoEl         = $('main-video');
   const playerContainer = $('player-container');
   const channelsGrid    = $('channels-grid');
-  const searchInput     = $('search-input');
+  const searchInput     = $('sidebar-search-input');
   const countrySelect   = $('country-select');
-  const categorySelect  = $('category-select');
   const languageSelect  = $('language-select');
   const hdCheckbox      = $('hd-checkbox');
   const favCheckbox     = $('fav-checkbox');
@@ -44,6 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const importFetchBtn  = $('import-fetch-btn');
   const importFile      = $('import-file');
   const importStatus    = $('import-status');
+  const categoryChipsContainer = $('category-chips');
+  const filterToggleBtn        = $('filter-toggle-btn');
+  const advancedFiltersPanel   = $('advanced-filters');
 
   // ── Init Player ────────────────────────────────────────────────────────────
   const player = new PakPlayer(videoEl, playerContainer);
@@ -69,11 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   store.init((channels, msg) => {
     if (msg) {
-      // Show status message in grid while fetching live data
       return;
     }
     if (channels) {
       populateFilterDropdowns();
+      renderCategoryChips();
       renderGrid();
       updateShelves();
     }
@@ -81,31 +83,97 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── Filter event listeners ─────────────────────────────────────────────────
   let debounce = null;
-  searchInput.addEventListener('input', e => {
-    clearTimeout(debounce);
-    debounce = setTimeout(() => {
-      state.filters.q = e.target.value;
-      renderGrid();
-    }, 200);
-  });
-
-  countrySelect.addEventListener('change',  e => { state.filters.country   = e.target.value; renderGrid(); });
-  categorySelect.addEventListener('change', e => { state.filters.category  = e.target.value; renderGrid(); });
-  languageSelect.addEventListener('change', e => { state.filters.language  = e.target.value; renderGrid(); });
-  hdCheckbox.addEventListener('change',     e => { state.filters.hd        = e.target.checked; renderGrid(); });
-  favCheckbox.addEventListener('change',    e => { state.filters.favOnly   = e.target.checked; renderGrid(); });
-
-  refreshBtn.addEventListener('click', () => {
-    showGridLoading();
-    store.init((channels) => {
-      if (channels) { populateFilterDropdowns(); renderGrid(); updateShelves(); }
+  if (searchInput) {
+    searchInput.addEventListener('input', e => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => {
+        state.filters.q = e.target.value;
+        renderGrid();
+      }, 200);
     });
-  });
+  }
+
+  if (countrySelect) {
+    countrySelect.addEventListener('change', async e => {
+      const selectedCountry = e.target.value;
+      state.filters.country = selectedCountry;
+      
+      if (selectedCountry) {
+        const code = IPTV_ORG_COUNTRIES[selectedCountry];
+        const hasChannels = store.all.some(c => c.country === selectedCountry);
+        
+        if (!hasChannels && code) {
+          showGridLoading();
+          await store.loadCountry(code, (channels) => {
+            if (channels) {
+              populateFilterDropdowns();
+              renderCategoryChips();
+              renderGrid();
+            }
+          });
+        } else {
+          renderGrid();
+        }
+      } else {
+        renderGrid();
+      }
+    });
+  }
+
+  if (languageSelect) {
+    languageSelect.addEventListener('change', e => { state.filters.language = e.target.value; renderGrid(); });
+  }
+  if (hdCheckbox) {
+    hdCheckbox.addEventListener('change', e => { state.filters.hd = e.target.checked; renderGrid(); });
+  }
+  if (favCheckbox) {
+    favCheckbox.addEventListener('change', e => { state.filters.favOnly = e.target.checked; renderGrid(); });
+  }
+
+  if (filterToggleBtn && advancedFiltersPanel) {
+    filterToggleBtn.addEventListener('click', () => {
+      advancedFiltersPanel.classList.toggle('collapsed');
+      filterToggleBtn.classList.toggle('active');
+    });
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      showGridLoading();
+      store.init((channels) => {
+        if (channels) { 
+          populateFilterDropdowns(); 
+          renderCategoryChips();
+          renderGrid(); 
+          updateShelves(); 
+        }
+      });
+    });
+  }
+
+  // ── Category Chips ─────────────────────────────────────────────────────────
+  function renderCategoryChips() {
+    if (!categoryChipsContainer) return;
+    const categories = ['All', ...store.categories];
+    categoryChipsContainer.innerHTML = '';
+    categories.forEach(cat => {
+      const chip = document.createElement('button');
+      chip.className = 'category-chip' + (state.filters.category === cat || (cat === 'All' && !state.filters.category) ? ' active' : '');
+      chip.textContent = cat;
+      chip.addEventListener('click', () => {
+        state.filters.category = cat === 'All' ? '' : cat;
+        document.querySelectorAll('.category-chip').forEach(el => {
+          el.classList.toggle('active', el.textContent === cat);
+        });
+        renderGrid();
+      });
+      categoryChipsContainer.appendChild(chip);
+    });
+  }
 
   // ── Filter dropdowns ───────────────────────────────────────────────────────
   function populateFilterDropdowns() {
-    populateSelect(countrySelect,  store.countries,  'All Countries');
-    populateSelect(categorySelect, store.categories, 'All Categories');
+    populateSelect(countrySelect, Object.keys(IPTV_ORG_COUNTRIES), 'All Countries');
     populateSelect(languageSelect, store.languages,  'All Languages');
   }
 
