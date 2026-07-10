@@ -1,12 +1,15 @@
-const CACHE_NAME = 'paktv-cache-v7';
+const CACHE_NAME = 'paktv-cache-v8';
 const ASSETS = [
   '/',
   '/index.html',
   '/css/style.css',
-  '/js/app.js?v=7',
-  '/js/player.js?v=7',
-  '/js/channels.js?v=7',
-  '/manifest.json'
+  '/js/app.js?v=8',
+  '/js/player.js?v=8',
+  '/js/channels.js?v=8',
+  '/manifest.json',
+  '/icons/tv-placeholder.svg',
+  '/icons/icon-192.svg',
+  '/icons/icon-512.svg'
 ];
 
 // Install Event
