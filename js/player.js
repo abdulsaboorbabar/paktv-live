@@ -1,9 +1,6 @@
 // js/player.js
 
-// ── CORS Proxy (Cloudflare Worker) ────────────────────────────────────────────
-// Set your deployed Cloudflare Worker URL here after deploying worker/cors-proxy.js
-// Example: 'https://paktv-proxy.your-username.workers.dev'
-const CORS_PROXY = localStorage.getItem('paktv_proxy') || '';
+const CORS_PROXY = localStorage.getItem('paktv_proxy') || (window.location.hostname.includes('vercel.app') ? '/api/cors-proxy' : '');
 
 class PakPlayer {
   constructor(videoElement, containerElement) {
