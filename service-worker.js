@@ -3,9 +3,9 @@ const ASSETS = [
   '/',
   '/index.html',
   '/css/style.css',
-  '/js/app.js',
-  '/js/player.js',
-  '/js/channels.js',
+  '/js/app.js?v=2',
+  '/js/player.js?v=2',
+  '/js/channels.js?v=2',
   '/manifest.json'
 ];
 

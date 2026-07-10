@@ -67,6 +67,25 @@ class PakPlayer {
     this.video.addEventListener('leavepictureinpicture', () => {
       this.container.classList.remove('pip-mode');
     });
+
+    // Native Safari/iOS handlers (attached once)
+    this.video.addEventListener('loadedmetadata', () => {
+      if (!this.hls && this.video.src) {
+        this.hideStatus();
+        this.video.play().catch(e => {
+          this.showStatus('Auto-play blocked. Click play to start.');
+          this.hideBuffer();
+        });
+      }
+    });
+
+    this.video.addEventListener('error', (e) => {
+      // Only trigger reconnection if native src is set and HLS.js is not active
+      if (!this.hls && this.video.src && this.video.error) {
+        console.warn('Native video error encountered:', this.video.error);
+        this.handleReconnection();
+      }
+    });
   }
 
   loadStream(url, isRetry = false) {
@@ -78,9 +97,7 @@ class PakPlayer {
     this.showBuffer();
     this.showStatus(isRetry ? `Stream disconnected. Retrying (${this.retryCount}/${this.maxRetries})...` : 'Connecting to stream...');
 
-    if (this.hls) {
-      this.hls.destroy();
-    }
+    this.destroyHls();
 
     if (Hls.isSupported()) {
       this.hls = new Hls({
@@ -123,13 +140,7 @@ class PakPlayer {
     } else if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
       // Native Safari support
       this.video.src = url;
-      this.video.addEventListener('loadedmetadata', () => {
-        this.hideStatus();
-        this.video.play();
-      });
-      this.video.addEventListener('error', () => {
-        this.handleReconnection();
-      });
+      this.video.load();
     } else {
       this.showError('Your browser does not support HLS.js streaming.');
     }
