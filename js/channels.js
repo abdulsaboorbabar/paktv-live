@@ -1,18 +1,17 @@
 // js/channels.js
 // Channel store: hardcoded fallback + live iptv-org M3U fetcher + parser
 
-// ── Fallback channel list (used when iptv-org fetch fails) ───────────────────
 const FALLBACK_CHANNELS = [
   { id: 999, name: 'Mux Test Stream (Works 100%)', country: 'Global', category: 'Test', language: 'English', logo: '', is_hd: 1, stream_url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8' },
-  { id:1, name:'Red Bull TV', country:'Global', category:'Sports', language:'English', logo:'', is_hd:1, stream_url:'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8' },
-  { id:2, name:'Bloomberg', country:'USA', category:'News', language:'English', logo:'', is_hd:1, stream_url:'https://live.bloomberg.com/btv/us/master.m3u8' },
-  { id:3, name:'NASA TV', country:'USA', category:'Science', language:'English', logo:'', is_hd:1, stream_url:'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8' },
-  { id:4, name:'Al Jazeera English', country:'Qatar', category:'News', language:'English', logo:'', is_hd:1, stream_url:'https://live-hls-web-aje.getaj.net/AJE/index.m3u8' },
-  { id:5, name:'TRT World', country:'Turkey', category:'News', language:'English', logo:'', is_hd:1, stream_url:'https://tv-trtworld.medya.trt.com.tr/master.m3u8' },
-  { id:6, name:'CNA (Channel News Asia)', country:'Singapore', category:'News', language:'English', logo:'', is_hd:1, stream_url:'https://d2e1asnsl7br7b.cloudfront.net/7782e205e72f43aeb4a48ec97f66ebbe/index.m3u8' },
-  { id:7, name:'Sky News', country:'UK', category:'News', language:'English', logo:'', is_hd:1, stream_url:'https://skynews.ssai.zype.com/manifest.m3u8' },
+  { id:1, name:'Discover Pakistan HD', country:'Pakistan', category:'Entertainment', language:'Urdu', logo:'https://i.imgur.com/KLrfKRn.png', is_hd:1, stream_url:'https://livecdn.live247stream.com/discoverpakistan/web/playlist.m3u8' },
+  { id:2, name:'Geo News Live', country:'Pakistan', category:'News', language:'Urdu', logo:'https://raw.githubusercontent.com/nicholaswmin/country-flag-icons/master/3x2/PK.svg', is_hd:0, stream_url:'https://jk3lz82elw79-hls-live.5centscdn.com/newgeonews/07811dc6c422334ce36a09ff5cd6fe71.sdp/playlist.m3u8' },
+  { id:3, name:'Dunya News HD', country:'Pakistan', category:'News', language:'Urdu', logo:'', is_hd:1, stream_url:'https://imob.dunyanews.tv/livehd/ngrp:dunyalivehd_2_all/playlist.m3u8' },
+  { id:4, name:'NASA TV', country:'USA', category:'Science', language:'English', logo:'', is_hd:1, stream_url:'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8' },
+  { id:5, name:'Al Jazeera English', country:'Qatar', category:'News', language:'English', logo:'', is_hd:1, stream_url:'https://live-hls-web-aje.getaj.net/AJE/index.m3u8' },
+  { id:6, name:'TRT World', country:'Turkey', category:'News', language:'English', logo:'', is_hd:1, stream_url:'https://tv-trtworld.medya.trt.com.tr/master.m3u8' },
+  { id:7, name:'CNA (Channel News Asia)', country:'Singapore', category:'News', language:'English', logo:'', is_hd:1, stream_url:'https://d2e1asnsl7br7b.cloudfront.net/7782e205e72f43aeb4a48ec97f66ebbe/index.m3u8' },
   { id:8, name:'CGTN', country:'China', category:'News', language:'English', logo:'', is_hd:1, stream_url:'https://news.cgtn.com/resource/live/english/cgtn-news.m3u8' },
-  { id:9, name:'92 News HD', country:'Pakistan', category:'News', language:'Urdu', logo:'https://i.imgur.com/gp1Ao4s.jpeg', is_hd:1, stream_url:'https://92news.vdn.dstreamone.net/92newshd/92hd/playlist.m3u8' },
+  { id:9, name:'Red Bull TV', country:'Global', category:'Sports', language:'English', logo:'', is_hd:1, stream_url:'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8' },
 ];
 
 // ── IPTV-Org country codes ────────────────────────────────────────────────────
