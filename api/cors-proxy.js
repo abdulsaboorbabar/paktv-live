@@ -67,8 +67,10 @@ module.exports = async (req, res) => {
       return res.send(text);
     }
 
-    // Otherwise, pipe the binary stream directly
-    response.body.pipe(res);
+    // Otherwise, send the binary buffer directly
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    return res.send(buffer);
 
   } catch (err) {
     console.error('Proxy error:', err);
