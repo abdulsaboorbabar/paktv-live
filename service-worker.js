@@ -1,22 +1,25 @@
-// service-worker.js
-const CACHE_NAME = 'paktv-cache-v1';
+const CACHE_NAME = 'paktv-cache-v2';
 const ASSETS = [
   '/',
-  '/index.php',
+  '/index.html',
   '/css/style.css',
   '/js/app.js',
   '/js/player.js',
-  '/manifest.json',
-  '/assets/offline.html',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png'
+  '/js/channels.js',
+  '/manifest.json'
 ];
 
 // Install Event
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
+      // Use ignoreSearch to prevent query param cache misses if any
+      return Promise.all(
+        ASSETS.map(url => fetch(url).then(res => {
+          if (!res.ok) throw new Error('Failed to fetch ' + url);
+          return cache.put(url, res);
+        }).catch(err => console.warn('Cache install skipping:', url, err)))
+      );
     }).then(() => self.skipWaiting())
   );
 });
@@ -36,39 +39,24 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Fetch Event
+// Fetch Event (Stale-While-Revalidate for static assets)
 self.addEventListener('fetch', (e) => {
-  // Let API requests bypass the service worker cache directly to network,
-  // or use Network First for dynamic endpoints
-  if (e.request.url.includes('/api/')) {
-    e.respondWith(
-      fetch(e.request).catch(() => {
-        return new Response(JSON.stringify({ success: false, error: 'Offline' }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
-      })
-    );
+  // Ignore non-GET and cross-origin requests
+  if (e.request.method !== 'GET' || !e.request.url.startsWith(self.location.origin)) {
     return;
   }
 
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        // Return cached, but fetch fresh in background
-        fetch(e.request).then((networkResponse) => {
-          if (networkResponse.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, networkResponse));
-          }
-        }).catch(() => {/* Ignore network errors during background sync */});
-        return cachedResponse;
-      }
-
-      return fetch(e.request).catch(() => {
-        // If request is for a document/page, show offline.html
-        if (e.request.headers.get('accept').includes('text/html')) {
-          return caches.match('/assets/offline.html');
+      const fetchPromise = fetch(e.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, responseToCache));
         }
-      });
+        return networkResponse;
+      }).catch(() => null);
+
+      return cachedResponse || fetchPromise.then(res => res || new Response('Offline', {status: 503}));
     })
   );
 });

@@ -143,7 +143,7 @@ class PakPlayer {
         this.loadStream(this.streamUrl, true);
       }, this.retryDelay);
     } else {
-      this.showError('Stream offline or blocked (CORS). Try another channel.');
+      this.showError('Stream offline or blocked. Click IMPORT (top-right) for fresh channels.');
       this.hideBuffer();
     }
   }
