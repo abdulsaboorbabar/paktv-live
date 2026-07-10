@@ -211,14 +211,22 @@
     </label>
 
     <div id="import-status" class="import-status"></div>
+
+    <div class="modal-divider"><span>CORS Proxy (optional)</span></div>
+    <p class="modal-desc" style="margin-bottom:0.5rem">If streams are CORS-blocked, deploy <code>worker/cors-proxy.js</code> to <a href="https://dash.cloudflare.com/workers" target="_blank" style="color:var(--color-accent)">Cloudflare Workers</a> (free) and paste your Worker URL below to bypass all blocks.</p>
+    <div class="import-url-row">
+      <input type="url" id="proxy-url" placeholder="https://your-worker.workers.dev" class="import-input">
+      <button id="proxy-save-btn" class="btn-primary">Save</button>
+    </div>
+    <div id="proxy-status" class="import-status"></div>
   </div>
 </div>
 
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-<script src="/js/channels.js?v=9"></script>
-<script src="/js/player.js?v=9"></script>
-<script src="/js/app.js?v=9"></script>
+<script src="/js/channels.js?v=10"></script>
+<script src="/js/player.js?v=10"></script>
+<script src="/js/app.js?v=10"></script>
 
 <script>
   // / key focuses search box

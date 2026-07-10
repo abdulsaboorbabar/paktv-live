@@ -346,10 +346,32 @@ document.addEventListener('DOMContentLoaded', () => {
     importModal.classList.add('open');
     importStatus.textContent = '';
     importUrlInput.value = '';
+    // Load saved proxy URL
+    const proxyInput = $('proxy-url');
+    if (proxyInput) proxyInput.value = localStorage.getItem('paktv_proxy') || '';
   });
 
   importClose.addEventListener('click', () => importModal.classList.remove('open'));
   importModal.addEventListener('click', e => { if (e.target === importModal) importModal.classList.remove('open'); });
+
+  // Proxy Save
+  const proxySaveBtn = $('proxy-save-btn');
+  const proxyStatus  = $('proxy-status');
+  if (proxySaveBtn) {
+    proxySaveBtn.addEventListener('click', () => {
+      const val = ($('proxy-url').value || '').trim().replace(/\/$/, '');
+      if (val && !val.startsWith('https://')) {
+        proxyStatus.textContent = '✗ Proxy URL must start with https://';
+        proxyStatus.className = 'import-status error';
+        return;
+      }
+      localStorage.setItem('paktv_proxy', val);
+      proxyStatus.textContent = val
+        ? `✓ Proxy saved! Reload the page once to activate.`
+        : '✓ Proxy cleared.';
+      proxyStatus.className = 'import-status success';
+    });
+  }
 
   // Quick-load iptv-org country buttons
   document.querySelectorAll('.iptv-org-btn').forEach(btn => {

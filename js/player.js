@@ -1,5 +1,10 @@
 // js/player.js
 
+// ── CORS Proxy (Cloudflare Worker) ────────────────────────────────────────────
+// Set your deployed Cloudflare Worker URL here after deploying worker/cors-proxy.js
+// Example: 'https://paktv-proxy.your-username.workers.dev'
+const CORS_PROXY = localStorage.getItem('paktv_proxy') || '';
+
 class PakPlayer {
   constructor(videoElement, containerElement) {
     this.video = videoElement;
@@ -11,6 +16,7 @@ class PakPlayer {
     this.maxRetries = 5;
     this.retryDelay = 3000; // 3 seconds
     this.isPlaying = false;
+    this.usingProxy = false;
     
     // Preferences
     this.volume = parseFloat(localStorage.getItem('pakplayer_volume')) || 0.8;
@@ -95,33 +101,52 @@ class PakPlayer {
       this.retryCount = 0;
     }
 
-    // Check for Mixed Content (HTTP streams on HTTPS site)
-    const isHttps = window.location.protocol === 'https:';
-    if (isHttps && url.startsWith('http://')) {
-      this.showError('HTTP stream blocked on HTTPS site. Please run locally using run.bat to play.');
-      this.hideBuffer();
-      return;
-    }
-
+    this.usingProxy = false;
     this.showBuffer();
     this.showStatus(isRetry ? `Stream disconnected. Retrying (${this.retryCount}/${this.maxRetries})...` : 'Connecting to stream...');
 
-    // Run a quick pre-flight fetch to check for CORS blocks or offline servers
-    if (!isRetry) {
-      fetch(url, { method: 'GET', mode: 'cors' })
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          // Proceed with HLS loading
-          this.initHlsLoader(url);
-        })
-        .catch(err => {
-          console.warn('Pre-flight fetch failed:', err);
-          this.showError('Stream offline or blocked by browser security (CORS). Try another channel.');
-          this.hideBuffer();
-        });
-    } else {
-      this.initHlsLoader(url);
+    // Auto-proxy: try direct first; on CORS fail route through Cloudflare Worker proxy
+    this._tryLoadWithFallback(url);
+  }
+
+  _proxyUrl(url) {
+    if (!CORS_PROXY) return null;
+    return `${CORS_PROXY}?url=${encodeURIComponent(url)}`;
+  }
+
+  _tryLoadWithFallback(url) {
+    // Mixed Content shortcut — try proxy directly on HTTPS if stream is HTTP
+    const isHttps = window.location.protocol === 'https:';
+    if (isHttps && url.startsWith('http://')) {
+      const proxied = this._proxyUrl(url);
+      if (proxied) {
+        this.usingProxy = true;
+        this.showStatus('Connecting via proxy...');
+        this.initHlsLoader(proxied);
+      } else {
+        this.showError('HTTP stream blocked. Deploy the CORS proxy to play. See worker/cors-proxy.js');
+        this.hideBuffer();
+      }
+      return;
     }
+
+    fetch(url, { method: 'GET', mode: 'cors', signal: AbortSignal.timeout(5000) })
+      .then(res => {
+        if (!res.ok && res.status !== 206) throw new Error(`HTTP ${res.status}`);
+        this.initHlsLoader(url);
+      })
+      .catch(err => {
+        console.warn('Direct fetch failed, trying proxy:', err.message);
+        const proxied = this._proxyUrl(url);
+        if (proxied) {
+          this.usingProxy = true;
+          this.showStatus('Direct blocked — routing via proxy...');
+          this.initHlsLoader(proxied);
+        } else {
+          this.showError('Stream blocked by CORS. Deploy worker/cors-proxy.js to Cloudflare to fix.');
+          this.hideBuffer();
+        }
+      });
   }
 
   initHlsLoader(url) {
