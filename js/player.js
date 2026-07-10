@@ -107,8 +107,11 @@ class PakPlayer {
         manifestLoadingRetryDelay: 1000
       });
       
-      this.hls.loadSource(url);
       this.hls.attachMedia(this.video);
+      
+      this.hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+        this.hls.loadSource(url);
+      });
 
       this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
         this.hideStatus();
