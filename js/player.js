@@ -94,6 +94,15 @@ class PakPlayer {
     if (!isRetry) {
       this.retryCount = 0;
     }
+
+    // Check for Mixed Content (HTTP streams on HTTPS site)
+    const isHttps = window.location.protocol === 'https:';
+    if (isHttps && url.startsWith('http://')) {
+      this.showError('HTTP stream blocked on HTTPS site. Please run locally using run.bat to play.');
+      this.hideBuffer();
+      return;
+    }
+
     this.showBuffer();
     this.showStatus(isRetry ? `Stream disconnected. Retrying (${this.retryCount}/${this.maxRetries})...` : 'Connecting to stream...');
 

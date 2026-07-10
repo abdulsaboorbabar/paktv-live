@@ -190,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
           <span class="badge badge-cat">${ch.category || 'TV'}</span>
           ${ch.country ? `<span class="meta-country">${ch.country}</span>` : ''}
           ${ch.is_hd ? '<span class="badge badge-hd">HD</span>' : ''}
+          ${ch.is_http ? '<span class="badge badge-cat" style="color:#ef4444; border: 1px solid rgba(239,68,68,0.25)">Local HTTP</span>' : ''}
         </div>
       </div>
       <button class="favorite-btn ${isFav ? 'is-fav' : ''}" data-id="${ch.id}" title="${isFav ? 'Remove from favorites' : 'Add to favorites'}">

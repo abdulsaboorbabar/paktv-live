@@ -81,6 +81,7 @@ function parseM3U(text, defaultCountry = '') {
           logo_url:   meta.logo,
           epg_id:     meta.epg_id,
           is_hd:      meta.is_hd,
+          is_http:    line.startsWith('http://'),
         });
       }
       meta = null;
@@ -107,9 +108,7 @@ class ChannelStore {
   }
 
   async init(onProgress) {
-    const isHttps = window.location.protocol === 'https:';
-    
-    // Always start with fallback immediately (fallback channels are all HTTPS)
+    // Always start with fallback immediately
     this._channels = [...FALLBACK_CHANNELS];
     this._loaded   = true;
     if (onProgress) onProgress(this._channels);
@@ -117,12 +116,7 @@ class ChannelStore {
     // Then try to fetch live Pakistan channels from iptv-org
     try {
       if (onProgress) onProgress(null, 'Fetching live channels from iptv-org...');
-      let live = await fetchIPTVOrg('pk');
-      
-      // Filter out HTTP streams if running on HTTPS to avoid Mixed Content blocks
-      if (isHttps) {
-        live = live.filter(c => c.stream_url.startsWith('https://'));
-      }
+      const live = await fetchIPTVOrg('pk');
 
       if (live.length > 0) {
         // Merge: live channels first, then any fallback channels whose name
@@ -139,14 +133,9 @@ class ChannelStore {
   }
 
   add(channels) {
-    const isHttps = window.location.protocol === 'https:';
-    let filtered = channels;
-    if (isHttps) {
-      filtered = channels.filter(c => c.stream_url.startsWith('https://'));
-    }
     // Merge imported channels (avoid duplicate stream URLs)
     const existing = new Set(this._channels.map(c => c.stream_url));
-    const newOnes  = filtered.filter(c => !existing.has(c.stream_url));
+    const newOnes  = channels.filter(c => !existing.has(c.stream_url));
     this._channels = [...this._channels, ...newOnes];
     return newOnes.length;
   }

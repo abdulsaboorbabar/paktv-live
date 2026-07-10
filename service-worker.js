@@ -1,11 +1,11 @@
-const CACHE_NAME = 'paktv-cache-v6';
+const CACHE_NAME = 'paktv-cache-v7';
 const ASSETS = [
   '/',
   '/index.html',
   '/css/style.css',
-  '/js/app.js?v=6',
-  '/js/player.js?v=6',
-  '/js/channels.js?v=6',
+  '/js/app.js?v=7',
+  '/js/player.js?v=7',
+  '/js/channels.js?v=7',
   '/manifest.json'
 ];
 
