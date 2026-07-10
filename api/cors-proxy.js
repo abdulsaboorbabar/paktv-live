@@ -1,6 +1,8 @@
 // api/cors-proxy.js
 // Vercel Serverless Function acting as a CORS proxy for HLS streams.
 
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 module.exports = async (req, res) => {
   // Enable CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
