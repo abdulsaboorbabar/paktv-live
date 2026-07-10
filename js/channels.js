@@ -3,6 +3,7 @@
 
 // ── Fallback channel list (used when iptv-org fetch fails) ───────────────────
 const FALLBACK_CHANNELS = [
+  { id: 999, name: 'Mux Test Stream (Works 100%)', country: 'Global', category: 'Test', language: 'English', logo: '', is_hd: 1, stream_url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8' },
   { id:1, name:'Red Bull TV', country:'Global', category:'Sports', language:'English', logo:'', is_hd:1, stream_url:'https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8' },
   { id:2, name:'Bloomberg', country:'USA', category:'News', language:'English', logo:'', is_hd:1, stream_url:'https://live.bloomberg.com/btv/us/master.m3u8' },
   { id:3, name:'NASA TV', country:'USA', category:'Science', language:'English', logo:'', is_hd:1, stream_url:'https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8' },
@@ -107,7 +108,9 @@ class ChannelStore {
   }
 
   async init(onProgress) {
-    // Always start with fallback immediately
+    const isHttps = window.location.protocol === 'https:';
+    
+    // Always start with fallback immediately (fallback channels are all HTTPS)
     this._channels = [...FALLBACK_CHANNELS];
     this._loaded   = true;
     if (onProgress) onProgress(this._channels);
@@ -115,7 +118,13 @@ class ChannelStore {
     // Then try to fetch live Pakistan channels from iptv-org
     try {
       if (onProgress) onProgress(null, 'Fetching live channels from iptv-org...');
-      const live = await fetchIPTVOrg('pk');
+      let live = await fetchIPTVOrg('pk');
+      
+      // Filter out HTTP streams if running on HTTPS to avoid Mixed Content blocks
+      if (isHttps) {
+        live = live.filter(c => c.stream_url.startsWith('https://'));
+      }
+
       if (live.length > 0) {
         // Merge: live channels first, then any fallback channels whose name
         // doesn't already exist in the live set
@@ -131,9 +140,14 @@ class ChannelStore {
   }
 
   add(channels) {
+    const isHttps = window.location.protocol === 'https:';
+    let filtered = channels;
+    if (isHttps) {
+      filtered = channels.filter(c => c.stream_url.startsWith('https://'));
+    }
     // Merge imported channels (avoid duplicate stream URLs)
     const existing = new Set(this._channels.map(c => c.stream_url));
-    const newOnes  = channels.filter(c => !existing.has(c.stream_url));
+    const newOnes  = filtered.filter(c => !existing.has(c.stream_url));
     this._channels = [...this._channels, ...newOnes];
     return newOnes.length;
   }
