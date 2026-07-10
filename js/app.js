@@ -3,6 +3,7 @@
 document.addEventListener('DOMContentLoaded', () => {
 
   // ── State ──────────────────────────────────────────────────────────────────
+  let imgObserver;
   const state = {
     favorites:     JSON.parse(localStorage.getItem('paktv_fav')  || '[]'),
     history:       JSON.parse(localStorage.getItem('paktv_hist') || '[]'),
@@ -274,7 +275,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ── Lazy image loading ─────────────────────────────────────────────────────
-  let imgObserver;
   function observeLazyImages() {
     const imgs = document.querySelectorAll('.lazy-logo[data-src]');
     if ('IntersectionObserver' in window) {
